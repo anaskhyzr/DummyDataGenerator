@@ -7,6 +7,8 @@ function App() {
   const [numRows, setNumRows] = useState('');
   const [fields, setFields] = useState([{ fieldName: '', dataType: '', enumValue: '' }]);
   const [output, setOutput] = useState('');
+  const [format, setFormat] = useState('SQL');
+  const [errors, setErrors] = useState({});
 
   const handleFieldChange = (index, event) => {
     const values = [...fields];
@@ -25,15 +27,27 @@ function App() {
   };
 
   const validateInput = () => {
+    const errors = {};
     if (!tableName.trim()) {
-      alert("Table name cannot be empty.");
-      return false;
+      errors.tableName = "Table name cannot be empty.";
     }
     if (!numRows.trim() || isNaN(numRows)) {
-      alert("Number of rows must be a valid integer.");
-      return false;
+      errors.numRows = "Number of rows must be a valid integer.";
     }
-    return true;
+    fields.forEach((field, index) => {
+      if (!field.fieldName.trim()) {
+        errors[`fieldName_${index}`] = "Field name cannot be empty.";
+      }
+      if (!field.dataType) {
+        errors[`dataType_${index}`] = "Data type must be selected.";
+      }
+      if (field.dataType === 'ENUM' && !field.enumValue.trim()) {
+        errors[`enumValue_${index}`] = "ENUM values cannot be empty.";
+      }
+    });
+
+    setErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const generateInsertStatements = async () => {
@@ -42,15 +56,63 @@ function App() {
     const requestData = {
       tableName,
       numRows,
-      fields
+      fields,
+      format
     };
 
     try {
-      const response = await axios.post('http://127.0.0.1:5000/generate', requestData);
-      setOutput(response.data.sqlStatements.join('\n'));
+      const response = await axios.post('http://127.0.0.1:5000/generate', requestData, {
+        responseType: format === 'CSV' || format === 'XML' || format === 'XLSX' ? 'blob' : 'json'
+      });
+
+      if (format === 'SQL' || format === 'JSON') {
+        setOutput(format === 'SQL' ? response.data.data.join('\n') : JSON.stringify(response.data.data, null, 2));
+      } else {
+        // For file formats (CSV, XML, XLSX), handle the download
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: response.headers['content-type'] }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `data.${format.toLowerCase()}`);
+        document.body.appendChild(link);
+        link.click();
+      }
     } catch (error) {
-      console.error("There was an error generating the SQL statements!", error);
-      alert("There was an error generating the SQL statements.");
+      console.error("There was an error generating the data!", error);
+      setErrors({ form: "There was an error generating the data." });
+    }
+  };
+
+  const exportData = () => {
+    if (!output) return;
+
+    const fileContent = output;
+    const fileType = format;
+    const fileName = `data.${fileType.toLowerCase()}`;
+
+    const blob = new Blob([fileContent], { type: getMimeType(fileType) });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const getMimeType = (fileType) => {
+    switch (fileType) {
+      case 'SQL':
+        return 'text/plain';
+      case 'JSON':
+        return 'application/json';
+      case 'CSV':
+        return 'text/csv';
+      case 'XML':
+        return 'application/xml';
+      case 'XLSX':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      default:
+        return 'text/plain';
     }
   };
 
@@ -65,9 +127,10 @@ function App() {
           onChange={(e) => setTableName(e.target.value)}
           placeholder="Value" 
         />
+        {errors.tableName && <div style={{ color: 'red' }}>{errors.tableName}</div>}
       </div>
       <div>
-        <label>Numbers of Rows</label>
+        <label>Number of Rows</label>
         <input 
           type="text" 
           name="numRows" 
@@ -75,6 +138,20 @@ function App() {
           onChange={(e) => setNumRows(e.target.value)}
           placeholder="Value" 
         />
+        {errors.numRows && <div style={{ color: 'red' }}>{errors.numRows}</div>}
+      </div>
+      <div>
+        <label>Format</label>
+        <select
+          value={format}
+          onChange={e => setFormat(e.target.value)}
+        >
+          <option value="SQL">SQL</option>
+          <option value="JSON">JSON</option>
+          <option value="CSV">CSV</option>
+          <option value="XML">XML</option>
+          <option value="XLSX">XLSX</option>
+        </select>
       </div><br/>
       {fields.map((field, index) => (
         <div key={index} style={{ display: 'flex', marginBottom: '10px' }}>
@@ -85,6 +162,7 @@ function App() {
             onChange={event => handleFieldChange(index, event)}
             placeholder="Field Name"
           />
+          {errors[`fieldName_${index}`] && <div style={{ color: 'red' }}>{errors[`fieldName_${index}`]}</div>}
           <select
             name="dataType"
             value={field.dataType}
@@ -110,6 +188,7 @@ function App() {
             <option value="TEXT">TEXT</option>
             <option value="ENUM">ENUM</option>
           </select>
+          {errors[`dataType_${index}`] && <div style={{ color: 'red' }}>{errors[`dataType_${index}`]}</div>}
           {field.dataType === 'ENUM' && (
             <input
               type="text"
@@ -119,20 +198,25 @@ function App() {
               placeholder="ENUM Value (comma-separated)"
             />
           )}
+          {errors[`enumValue_${index}`] && <div style={{ color: 'red' }}>{errors[`enumValue_${index}`]}</div>}
           <button type="button" onClick={() => handleRemoveField(index)}>Remove</button>
         </div>
       ))}
       <button type="button" onClick={handleAddField}>Add Field</button>
       <p></p>
       <button type="button" onClick={generateInsertStatements}>Generate Output</button>
-      <div>
-        <textarea
-          value={output}
-          placeholder="Output"
-          readOnly
-          style={{ width: '100%', height: '150px', marginTop: '10px' }}
-        />
-      </div>
+      <button type="button" onClick={exportData}>Export Data</button>
+      {errors.form && <div style={{ color: 'red' }}>{errors.form}</div>}
+      {(format === 'SQL' || format === 'JSON' || format === 'XML') && (
+        <div>
+          <textarea
+            value={output}
+            placeholder="Output"
+            readOnly
+            style={{ width: '100%', height: '150px', marginTop: '10px' }}
+          />
+        </div>
+      )}
     </div>
   );
 }
