@@ -150,7 +150,7 @@ function App() {
           <option value="JSON">JSON</option>
           <option value="CSV">CSV</option>
           <option value="XML">XML</option>
-          <option value="XLSX">XLSX</option>
+          <option value="CSV">Excel</option>
         </select>
       </div><br/>
       {fields.map((field, index) => (
@@ -207,7 +207,7 @@ function App() {
       <button type="button" onClick={generateInsertStatements}>Generate Output</button>
       <button type="button" onClick={exportData}>Export Data</button>
       {errors.form && <div style={{ color: 'red' }}>{errors.form}</div>}
-      {(format === 'SQL' || format === 'JSON' || format === 'XML') && (
+      {(format === 'SQL' || format === 'JSON' || format === 'XML' || format === 'CSV') && (
         <div>
           <textarea
             value={output}

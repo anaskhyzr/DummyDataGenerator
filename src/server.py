@@ -145,14 +145,6 @@ def generate_xml_data(num_rows, fields):
             field_element.text = str(value)
     return ET.tostring(root, encoding='unicode')
 
-def generate_xlsx_data(num_rows, fields):
-    data = generate_json_data(num_rows, fields)
-    df = pd.DataFrame(data)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
-    return output.getvalue()
-
 @app.route('/generate', methods=['POST'])
 def generate_insert_statements():
     data = request.json
@@ -181,9 +173,6 @@ def generate_insert_statements():
     elif format_type == 'XML':
         xml_data = generate_xml_data(num_rows, fields)
         return Response(xml_data, mimetype='application/xml', headers={"Content-Disposition": "attachment;filename=data.xml"})
-    elif format_type == 'XLSX':
-        xlsx_data = generate_xlsx_data(num_rows, fields)
-        return Response(xlsx_data, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={"Content-Disposition": "attachment;filename=data.xlsx"})
     else:
         return jsonify({"error": "Invalid format type."}), 400
 
