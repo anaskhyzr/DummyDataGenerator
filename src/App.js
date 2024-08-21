@@ -148,9 +148,8 @@ function App() {
         >
           <option value="SQL">SQL</option>
           <option value="JSON">JSON</option>
-          <option value="CSV">CSV</option>
+          <option value="CSV">CSV OR EXCEL</option>
           <option value="XML">XML</option>
-          <option value="CSV">Excel</option>
         </select>
       </div><br/>
       {fields.map((field, index) => (
