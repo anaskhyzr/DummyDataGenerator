@@ -6,8 +6,7 @@ import json
 import xml.etree.ElementTree as ET
 import io
 import pandas as pd
-import xlsxwriter 
-import xml.etree.ElementTree as ET
+import xlsxwriter
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -201,10 +200,7 @@ def generate_xml_data(num_rows, fields):
     
     return xml_string
 
-
-
 # Function to generate Excel data
-
 def generate_excel_data(num_rows, fields):
     output = io.BytesIO()
     columns = [f['fieldName'] for f in fields]
@@ -217,10 +213,6 @@ def generate_excel_data(num_rows, fields):
 
     output.seek(0)  # Move the pointer back to the beginning of the file
     return output.getvalue()  # Return the binary content of the Excel file
-
-
-
-
 
 @app.route('/generate', methods=['POST'])
 def generate_insert_statements():
@@ -250,36 +242,12 @@ def generate_insert_statements():
         return Response(csv_data, mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=data.csv"})
     elif format_type == 'EXCEL':
         excel_data = generate_excel_data(num_rows, fields)
-        return Response(excel_data, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={"Content-Disposition": "attachment;filename=data.xlsx"} )
-    try:
-        if format_type == 'XML':
-            print(3)
-            xml_data = generate_xml_data(num_rows, fields)
-            print(f"Generated XML Data: {xml_data}")  # Debugging: Print XML Data
-            if not xml_data.strip():  # Check if XML data is empty
-                return "Error: No data generated", 500
-            return Response(xml_data, mimetype='application/xml', headers={"Content-Disposition": "attachment;filename=data.xml"})
-        # Handle other formats (CSV, EXCEL, etc.)
-    except Exception as e:
-        print(f"Error generating XML: {e}")
-        return "Error generating XML", 500
+        return Response(excel_data, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={"Content-Disposition": "attachment;filename=data.xlsx"})
+    elif format_type == 'XML':
+        xml_data = generate_xml_data(num_rows, fields)
+        return Response(xml_data, mimetype='application/xml', headers={"Content-Disposition": "attachment;filename=data.xml"})
     else:
         return jsonify({"error": "Invalid format type."}), 400
-    
-
-
-@app.route('/export', methods=['POST'])
-def export_data():
-    data = request.json  # Assuming the data is sent as JSON
-    # Process the data (e.g., convert to the desired format)
-    file_content = '\n'.join(data['output'])  # Assuming 'output' is a list of strings
-    
-    # Create a file-like object in memory
-    file = io.BytesIO(file_content.encode('utf-8'))
-    file.seek(0)
-    
-    # Return the file for download
-    return send_file(file, as_attachment=True, attachment_filename='exported_data.txt', mimetype='text/plain')
 
 if __name__ == '__main__':
     app.run(debug=True)
