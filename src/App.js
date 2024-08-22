@@ -31,8 +31,8 @@ function App() {
     if (!tableName.trim()) {
       errors.tableName = "Table name cannot be empty.";
     }
-    if (!numRows.trim() || isNaN(numRows)) {
-      errors.numRows = "Number of rows must be a valid integer.";
+    if (!numRows.trim() || isNaN(numRows) || numRows <= 0) {
+      errors.numRows = "Number of rows must be a positive integer.";
     }
     fields.forEach((field, index) => {
       if (!field.fieldName.trim()) {
@@ -52,55 +52,81 @@ function App() {
 
   const generateInsertStatements = async () => {
     if (!validateInput()) return;
-
+  
     const requestData = {
       tableName,
       numRows,
       fields,
       format
     };
-
+  
     try {
       const response = await axios.post('http://127.0.0.1:5000/generate', requestData, {
-        responseType: format === 'CSV' || format === 'XML' || format === 'XLSX' ? 'blob' : 'json'
+        responseType: format === 'EXCEL' ? 'arraybuffer' : 'json'
       });
 
+      console.log(7)
+  
       if (format === 'SQL' || format === 'JSON') {
         setOutput(format === 'SQL' ? response.data.data.join('\n') : JSON.stringify(response.data.data, null, 2));
-      } else {
-        // For file formats (CSV, XML, XLSX), handle the download
-        const url = window.URL.createObjectURL(new Blob([response.data], { type: response.headers['content-type'] }));
+      } else if (format === 'CSV' || format === 'XML') {
+        console.log(8)
+        setOutput(response.data);
+        console.log(9)
+        
+      } else if (format === 'EXCEL') {
+        // For Excel, download the file instead of displaying it
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `data.${format.toLowerCase()}`);
+        link.setAttribute('download', 'data.xlsx');
         document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
       }
     } catch (error) {
       console.error("There was an error generating the data!", error);
       setErrors({ form: "There was an error generating the data." });
     }
   };
-
+  
+  
   const exportData = () => {
     if (!output) return;
-
-    const fileContent = output;
-    const fileType = format;
-    const fileName = `data.${fileType.toLowerCase()}`;
-
-    const blob = new Blob([fileContent], { type: getMimeType(fileType) });
+  
+    const fileExtension = getFileExtension(format);  // Get the correct file extension
+    const fileName = `data.${fileExtension}`;
+    const mimeType = getMimeType(format);
+    const blob = new Blob([output], { type: mimeType });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
-    link.remove();
+    document.body.removeChild(link); // Clean up
   };
-
-  const getMimeType = (fileType) => {
-    switch (fileType) {
+  
+  const getFileExtension = (format) => {
+    switch (format) {
+      case 'SQL':
+        return 'sql';
+      case 'JSON':
+        return 'json';
+      case 'CSV':
+        return 'csv';
+      case 'XML':
+        return 'xml';
+      case 'EXCEL':
+        return 'xlsx';  // Correct extension for Excel files
+      default:
+        return 'txt';  // Default to plain text if format is unknown
+    }
+  };
+  
+  const getMimeType = (format) => {
+    switch (format) {
       case 'SQL':
         return 'text/plain';
       case 'JSON':
@@ -109,12 +135,13 @@ function App() {
         return 'text/csv';
       case 'XML':
         return 'application/xml';
-      case 'XLSX':
+      case 'EXCEL':
         return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       default:
         return 'text/plain';
     }
   };
+  
 
   return (
     <div style={{ padding: '20px' }}>
@@ -145,10 +172,12 @@ function App() {
         <select
           value={format}
           onChange={e => setFormat(e.target.value)}
+          
         >
           <option value="SQL">SQL</option>
           <option value="JSON">JSON</option>
-          <option value="CSV">CSV OR EXCEL</option>
+          <option value="CSV">CSV</option>
+          <option value="EXCEL">EXCEL</option>
           <option value="XML">XML</option>
         </select>
       </div><br/>
@@ -203,10 +232,12 @@ function App() {
       ))}
       <button type="button" onClick={handleAddField}>Add Field</button>
       <p></p>
+      console.log(1)
       <button type="button" onClick={generateInsertStatements}>Generate Output</button>
+      console.log(14)
       <button type="button" onClick={exportData}>Export Data</button>
       {errors.form && <div style={{ color: 'red' }}>{errors.form}</div>}
-      {(format === 'SQL' || format === 'JSON' || format === 'XML' || format === 'CSV') && (
+      {(format === 'SQL' || format === 'JSON' || format === 'XML' || format === 'CSV' || format ===  'EXCEL') && (
         <div>
           <textarea
             value={output}
