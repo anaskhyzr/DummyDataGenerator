@@ -1,0 +1,23 @@
+.field-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .add-button {
+    align-self: flex-start;
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 20px;
+    transition: background-color 0.3s;
+  }
+  
+  .add-button:hover {
+    background-color: #218838;
+  }
+  

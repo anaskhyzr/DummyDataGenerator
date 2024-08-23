@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import TableForm from './components/TableForm';
+import OutputDisplay from './components/OutputDisplay';
+import Header from './components/Header';
 import axios from 'axios';
+import LoadingBar from 'react-top-loading-bar';
 import * as XLSX from 'xlsx';
 import './App.css';
 
@@ -8,9 +12,10 @@ function App() {
   const [numRows, setNumRows] = useState('');
   const [fields, setFields] = useState([{ fieldName: '', dataType: '', enumValue: '' }]);
   const [output, setOutput] = useState('');
-  const [tableData, setTableData] = useState([]);
   const [format, setFormat] = useState('SQL');
   const [errors, setErrors] = useState({});
+  const [tableData, setTableData] = useState([]); // State for tableData
+  const ref = useRef(null);
 
   const handleFieldChange = (index, event) => {
     const values = [...fields];
@@ -55,16 +60,18 @@ function App() {
   const generateInsertStatements = async () => {
     if (!validateInput()) return;
 
+    ref.current.continuousStart(); // Start the loading bar
+
     const requestData = {
       tableName,
       numRows,
       fields,
-      format,
+      format
     };
 
     try {
       const response = await axios.post('http://127.0.0.1:5000/generate', requestData, {
-        responseType: format === 'EXCEL' ? 'arraybuffer' : 'json',
+        responseType: format === 'EXCEL' ? 'arraybuffer' : 'json'
       });
 
       if (format === 'SQL' || format === 'JSON') {
@@ -72,36 +79,51 @@ function App() {
       } else if (format === 'CSV' || format === 'XML') {
         setOutput(response.data);
       } else if (format === 'EXCEL') {
-        const data = new Uint8Array(response.data);
+        const data = response.data;
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        setTableData(jsonData);
+        setTableData(jsonData); // Set the table data
+        setOutput(''); // Clear text output
       }
     } catch (error) {
       console.error("There was an error generating the data!", error);
       setErrors({ form: "There was an error generating the data." });
+    } finally {
+      ref.current.complete(); // Complete the loading bar
     }
   };
 
   const exportData = () => {
     if (!output && format !== 'EXCEL') return;
-
+  
     const fileExtension = getFileExtension(format);
     const fileName = `data.${fileExtension}`;
     const mimeType = getMimeType(format);
-
+  
     let blob;
     if (format === 'EXCEL') {
       const worksheet = XLSX.utils.json_to_sheet(tableData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-      blob = XLSX.write(workbook, { bookType: 'xlsx', type: 'blob' });
+      
+      // Write workbook as binary string
+      const binaryString = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+      
+      // Convert binary string to array buffer
+      const arrayBuffer = new ArrayBuffer(binaryString.length);
+      const view = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < binaryString.length; i++) {
+        view[i] = binaryString.charCodeAt(i) & 0xFF;
+      }
+  
+      // Create Blob from array buffer
+      blob = new Blob([arrayBuffer], { type: mimeType });
     } else {
       blob = new Blob([output], { type: mimeType });
     }
-
+  
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -110,6 +132,7 @@ function App() {
     link.click();
     document.body.removeChild(link);
   };
+  
 
   const getFileExtension = (format) => {
     switch (format) {
@@ -146,128 +169,24 @@ function App() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div>
-        <label>Table Name</label>
-        <input
-          type="text"
-          name="tableName"
-          value={tableName}
-          onChange={(e) => setTableName(e.target.value)}
-          placeholder="Value"
-        />
-        {errors.tableName && <div style={{ color: 'red' }}>{errors.tableName}</div>}
-      </div>
-      <div>
-        <label>Number of Rows</label>
-        <input
-          type="text"
-          name="numRows"
-          value={numRows}
-          onChange={(e) => setNumRows(e.target.value)}
-          placeholder="Value"
-        />
-        {errors.numRows && <div style={{ color: 'red' }}>{errors.numRows}</div>}
-      </div>
-      <div>
-        <label>Format</label>
-        <select value={format} onChange={(e) => setFormat(e.target.value)}>
-          <option value="SQL">SQL</option>
-          <option value="JSON">JSON</option>
-          <option value="CSV">CSV</option>
-          <option value="EXCEL">EXCEL</option>
-          <option value="XML">XML</option>
-        </select>
-      </div>
-      <br />
-      {fields.map((field, index) => (
-        <div key={index} style={{ display: 'flex', marginBottom: '10px' }}>
-          <input
-            type="text"
-            name="fieldName"
-            value={field.fieldName}
-            onChange={(event) => handleFieldChange(index, event)}
-            placeholder="Field Name"
-          />
-          {errors[`fieldName_${index}`] && <div style={{ color: 'red' }}>{errors[`fieldName_${index}`]}</div>}
-          <select name="dataType" value={field.dataType} onChange={(event) => handleFieldChange(index, event)}>
-            <option value="">Data Type</option>
-            <option value="VARCHAR">VARCHAR</option>
-            <option value="INT">INT</option>
-            <option value="FLOAT">FLOAT</option>
-            <option value="DOUBLE">DOUBLE</option>
-            <option value="DECIMAL">DECIMAL</option>
-            <option value="DATE">DATE</option>
-            <option value="DATETIME">DATETIME</option>
-            <option value="TIMESTAMP">TIMESTAMP</option>
-            <option value="YEAR">YEAR</option>
-            <option value="CHAR">CHAR</option>
-            <option value="TINYINT">TINYINT</option>
-            <option value="SMALLINT">SMALLINT</option>
-            <option value="BIGINT">BIGINT</option>
-            <option value="MEDIUMINT">MEDIUMINT</option>
-            <option value="BOOLEAN">BOOLEAN</option>
-            <option value="BLOB">BLOB</option>
-            <option value="TEXT">TEXT</option>
-            <option value="ENUM">ENUM</option>
-          </select>
-          {errors[`dataType_${index}`] && <div style={{ color: 'red' }}>{errors[`dataType_${index}`]}</div>}
-          {field.dataType === 'ENUM' && (
-            <input
-              type="text"
-              name="enumValue"
-              value={field.enumValue}
-              onChange={(event) => handleFieldChange(index, event)}
-              placeholder="ENUM Value (comma-separated)"
-            />
-          )}
-          {errors[`enumValue_${index}`] && <div style={{ color: 'red' }}>{errors[`enumValue_${index}`]}</div>}
-          <button type="button" onClick={() => handleRemoveField(index)}>
-            Remove
-          </button>
-        </div>
-      ))}
-      <button type="button" onClick={handleAddField}>
-        Add Field
-      </button>
-      <p></p>
-      <button type="button" onClick={generateInsertStatements}>
-        Generate Output
-      </button>
-      <button type="button" onClick={exportData}>
-        Export Data
-      </button>
-      {errors.form && <div style={{ color: 'red' }}>{errors.form}</div>}
-      {(format === 'SQL' || format === 'JSON' || format === 'XML' || format === 'CSV') && (
-        <div>
-          <textarea
-            value={output}
-            placeholder="Output"
-            readOnly
-            style={{ width: '100%', height: '150px', marginTop: '10px' }}
-          />
-        </div>
-      )}
-      {format === 'EXCEL' && tableData.length > 0 && (
-        <table border="1" style={{ marginTop: '10px', width: '100%' }}>
-          <thead>
-            <tr>
-              {Object.keys(tableData[0]).map((key) => (
-                <th key={key}>{key}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.map((row, index) => (
-              <tr key={index}>
-                {Object.values(row).map((value, i) => (
-                  <td key={i}>{value}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <div className="container">
+      <LoadingBar color="#f11946" ref={ref} />  {/* Add the loading bar */}
+      <Header />
+      <TableForm
+        tableName={tableName}
+        numRows={numRows}
+        fields={fields}
+        errors={errors}
+        setTableName={setTableName}
+        setNumRows={setNumRows}
+        setFormat={setFormat}
+        handleFieldChange={handleFieldChange}
+        handleAddField={handleAddField}
+        handleRemoveField={handleRemoveField}
+        generateInsertStatements={generateInsertStatements}
+        exportData={exportData}
+      />
+      <OutputDisplay format={format} output={output} tableData={tableData} /> {/* Pass tableData to OutputDisplay */}
     </div>
   );
 }

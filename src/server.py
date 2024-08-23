@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 import io
 import pandas as pd
 import xlsxwriter
+import xml.etree.ElementTree as ET
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -33,12 +34,32 @@ def generate_sql_statements(table_name, num_rows, fields):
     for i in range(num_rows):
         values = []
         for field_name, data_type in collected_fields.items():
-            if data_type == 'ENUM':
-                value = random.choice(enums[field_name])
-            elif data_type == 'VARCHAR':
+            if data_type == 'VARCHAR':
                 value = faker.word()
             elif data_type == 'INT':
                 value = faker.random_int(min=0, max=100)
+            elif data_type == 'NAME':
+                value = faker.name()
+            elif data_type == 'FIRST NAME':
+                value = faker.first_name()
+            elif data_type == 'LAST NAME':
+                value = faker.last_name()
+            elif data_type == 'USERNAME':
+                value = faker.user_name()
+            elif data_type == 'EMAIL':
+                value = faker.email()
+            elif data_type == 'PHONE':
+                value = faker.phone_number()
+            elif data_type == 'AGE':
+                value = str(faker.random_int(min=18, max=60))
+            elif data_type == 'DOB':
+                value = faker.date_of_birth()
+            elif data_type == 'ADDRESS':
+                value = faker.address()
+            elif data_type == 'CITY':
+                value = faker.city()
+            elif data_type == 'COUNTRY':
+                value = faker.country()
             elif data_type == 'FLOAT':
                 value = round(faker.random_number(digits=5) * 0.01, 2)
             elif data_type == 'DOUBLE':
@@ -53,8 +74,6 @@ def generate_sql_statements(table_name, num_rows, fields):
                 value = faker.date_time().timestamp()
             elif data_type == 'YEAR':
                 value = faker.year()
-            elif data_type == 'CHAR':
-                value = faker.word()
             elif data_type == 'TINYINT':
                 value = faker.random_int(min=0, max=255)
             elif data_type == 'SMALLINT':
@@ -69,9 +88,11 @@ def generate_sql_statements(table_name, num_rows, fields):
                 value = faker.binary()
             elif data_type == 'TEXT':
                 value = faker.text()
+            elif data_type == 'ENUM':
+                value = random.choice(enums[field_name])
             else:
                 value = f'{field_name}_value{i + 1}'
-            
+
             values.append(f"'{value}'")
 
         sql = f"INSERT INTO {table_name} ({', '.join(collected_fields.keys())}) VALUES ({', '.join(values)});"
@@ -82,17 +103,47 @@ def generate_sql_statements(table_name, num_rows, fields):
 # Function to generate JSON data
 def generate_json_data(num_rows, fields):
     data = []
+    enums = {}
+
+    for field in fields:
+        field_name = field['fieldName']
+        data_type = field['dataType']
+        enum_values = field['enumValue'].split(',') if data_type == "ENUM" else None
+
+        if enum_values:
+            enums[field_name] = [value.strip() for value in enum_values]
+
     for _ in range(num_rows):
         row = {}
         for field in fields:
             field_name = field['fieldName']
             data_type = field['dataType']
-            if data_type == 'ENUM':
-                value = random.choice(field['enumValue'].split(','))
-            elif data_type == 'VARCHAR':
+            if data_type == 'VARCHAR':
                 value = faker.word()
             elif data_type == 'INT':
                 value = faker.random_int(min=0, max=100)
+            elif data_type == 'NAME':
+                value = faker.name()
+            elif data_type == 'FIRST NAME':
+                value = faker.first_name()
+            elif data_type == 'LAST NAME':
+                value = faker.last_name()
+            elif data_type == 'USERNAME':
+                value = faker.user_name()
+            elif data_type == 'EMAIL':
+                value = faker.email()
+            elif data_type == 'PHONE':
+                value = faker.phone_number()
+            elif data_type == 'AGE':
+                value = str(faker.random_int(min=18, max=60))
+            elif data_type == 'DOB':
+                value = faker.date_of_birth()
+            elif data_type == 'ADDRESS':
+                value = faker.address()
+            elif data_type == 'CITY':
+                value = faker.city()
+            elif data_type == 'COUNTRY':
+                value = faker.country()
             elif data_type == 'FLOAT':
                 value = round(faker.random_number(digits=5) * 0.01, 2)
             elif data_type == 'DOUBLE':
@@ -100,15 +151,13 @@ def generate_json_data(num_rows, fields):
             elif data_type == 'DECIMAL':
                 value = round(faker.random_number(digits=5) * 0.01, 2)
             elif data_type == 'DATE':
-                value = faker.date().isoformat()
+                value = faker.date()
             elif data_type == 'DATETIME':
-                value = faker.date_time().isoformat()
+                value = faker.date_time()
             elif data_type == 'TIMESTAMP':
                 value = faker.date_time().timestamp()
             elif data_type == 'YEAR':
                 value = faker.year()
-            elif data_type == 'CHAR':
-                value = faker.word()
             elif data_type == 'TINYINT':
                 value = faker.random_int(min=0, max=255)
             elif data_type == 'SMALLINT':
@@ -120,12 +169,14 @@ def generate_json_data(num_rows, fields):
             elif data_type == 'BOOLEAN':
                 value = faker.boolean()
             elif data_type == 'BLOB':
-                value = faker.binary().decode('latin1')  # Decode to string for JSON
+                value = faker.binary()
             elif data_type == 'TEXT':
                 value = faker.text()
+            elif data_type == 'ENUM':
+                value = random.choice(enums[field_name])
             else:
                 value = f'{field_name}_value'
-            
+
             row[field_name] = value
         data.append(row)
     return data
@@ -141,64 +192,87 @@ def generate_csv_data(num_rows, fields):
 
 # Function to generate XML data
 def generate_xml_data(num_rows, fields):
-    # Create the root element
+    enums = {}
+    for field in fields:
+        field_name = field['fieldName']
+        data_type = field['dataType']
+        enum_values = field['enumValue'].split(',') if data_type == "ENUM" else None
+
+        if enum_values:
+            enums[field_name] = [value.strip() for value in enum_values]
+
     root = ET.Element("data")
-    
-    # Generate data directly based on fields
+
     for _ in range(num_rows):
         record = ET.SubElement(root, "record")
         for field in fields:
             field_name = field['fieldName']
             data_type = field['dataType']
-            
-            # Generate field data based on its type
-            if data_type == 'ENUM':
-                value = random.choice(field['enumValue'].split(','))
-            elif data_type == 'VARCHAR':
+
+            if data_type == 'VARCHAR':
                 value = faker.word()
             elif data_type == 'INT':
-                value = str(faker.random_int(min=0, max=100))
+                value = faker.random_int(min=0, max=100)
+            elif data_type == 'NAME':
+                value = faker.name()
+            elif data_type == 'FIRST NAME':
+                value = faker.first_name()
+            elif data_type == 'LAST NAME':
+                value = faker.last_name()
+            elif data_type == 'USERNAME':
+                value = faker.user_name()
+            elif data_type == 'EMAIL':
+                value = faker.email()
+            elif data_type == 'PHONE':
+                value = faker.phone_number()
+            elif data_type == 'AGE':
+                value = str(faker.random_int(min=18, max=60))
+            elif data_type == 'DOB':
+                value = faker.date_of_birth()
+            elif data_type == 'ADDRESS':
+                value = faker.address()
+            elif data_type == 'CITY':
+                value = faker.city()
+            elif data_type == 'COUNTRY':
+                value = faker.country()
             elif data_type == 'FLOAT':
-                value = str(round(faker.random_number(digits=5) * 0.01, 2))
+                value = round(faker.random_number(digits=5) * 0.01, 2)
             elif data_type == 'DOUBLE':
-                value = str(round(faker.random_number(digits=10) * 0.01, 4))
+                value = round(faker.random_number(digits=10) * 0.01, 4)
             elif data_type == 'DECIMAL':
-                value = str(round(faker.random_number(digits=5) * 0.01, 2))
+                value = round(faker.random_number(digits=5) * 0.01, 2)
             elif data_type == 'DATE':
-                value = faker.date().isoformat()
+                value = faker.date()
             elif data_type == 'DATETIME':
-                value = faker.date_time().isoformat()
+                value = faker.date_time()
             elif data_type == 'TIMESTAMP':
-                value = str(faker.date_time().timestamp())
+                value = faker.date_time().timestamp()
             elif data_type == 'YEAR':
                 value = faker.year()
-            elif data_type == 'CHAR':
-                value = faker.word()
             elif data_type == 'TINYINT':
-                value = str(faker.random_int(min=0, max=255))
+                value = faker.random_int(min=0, max=255)
             elif data_type == 'SMALLINT':
-                value = str(faker.random_int(min=-32768, max=32767))
+                value = faker.random_int(min=-32768, max=32767)
             elif data_type == 'BIGINT':
-                value = str(faker.random_int(min=-9223372036854775808, max=9223372036854775807))
+                value = faker.random_int(min=-9223372036854775808, max=9223372036854775807)
             elif data_type == 'MEDIUMINT':
-                value = str(faker.random_int(min=-8388608, max=8388607))
+                value = faker.random_int(min=-8388608, max=8388607)
             elif data_type == 'BOOLEAN':
-                value = str(faker.boolean()).lower()  # Convert to lowercase for XML boolean values
+                value = faker.boolean()
             elif data_type == 'BLOB':
-                value = faker.binary().hex()  # Convert binary to a hexadecimal string
+                value = faker.binary()
             elif data_type == 'TEXT':
                 value = faker.text()
+            elif data_type == 'ENUM':
+                value = random.choice(enums[field_name])
             else:
                 value = f'{field_name}_value'
-            
-            # Create an XML element for each field
+
             field_element = ET.SubElement(record, field_name)
-            field_element.text = value
-    
-    # Convert the XML tree to a string
-    xml_string = ET.tostring(root, encoding='unicode')
-    
-    return xml_string
+            field_element.text = str(value)
+
+    xml_data = ET.tostring(root, encoding="utf-8", method="xml").decode()
+    return xml_data
 
 # Function to generate Excel data
 def generate_excel_data(num_rows, fields):
@@ -243,9 +317,15 @@ def generate_insert_statements():
     elif format_type == 'EXCEL':
         excel_data = generate_excel_data(num_rows, fields)
         return Response(excel_data, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={"Content-Disposition": "attachment;filename=data.xlsx"})
-    elif format_type == 'XML':
-        xml_data = generate_xml_data(num_rows, fields)
-        return Response(xml_data, mimetype='application/xml', headers={"Content-Disposition": "attachment;filename=data.xml"})
+    try:
+        if format_type == 'XML':
+            xml_data = generate_xml_data(num_rows, fields)
+            if not xml_data.strip():
+                return "Error: No data generated", 500
+            return Response(xml_data, mimetype='application/xml', headers={"Content-Disposition": "attachment;filename=data.xml"})
+    except Exception as e:
+        print(f"Error generating XML: {e}")
+        return "Error generating XML", 500
     else:
         return jsonify({"error": "Invalid format type."}), 400
 
